@@ -1,0 +1,61 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: parking
+      POSTGRES_USER: parking
+      POSTGRES_PASSWORD: parking
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U parking -d parking"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: parking
+      DB_USER: parking
+      DB_PASSWORD: parking
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET:-change-me-please-this-is-a-very-long-development-secret-key-1234567890}
+      SERVER_PORT: 8080
+      APP_ML_SIMULATE_SENSORS: "true"
+      APP_ML_HISTORY_WINDOW_DAYS: "30"
+      APP_ML_OCCUPANCY_PREDICTION_WINDOW_HOURS: "24"
+      APP_ML_SENSOR_TICK_MS: "8000"
+    ports:
+      - "8091:8080"
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      - app
+    ports:
+      - "3000:80"
+
+volumes:
+  postgres_data:
